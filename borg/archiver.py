@@ -22,7 +22,7 @@ from .repository import Repository
 from .cache import Cache
 from .key import key_creator
 from .helpers import Error, location_validator, format_time, format_file_size, \
-    format_file_mode, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
+    format_file_mode, Tag, ExcludePattern, IncludePattern, exclude_path, adjust_patterns, to_localtime, timestamp, \
     get_cache_dir, get_keys_dir, format_timedelta, prune_within, prune_split, \
     Manifest, remove_surrogates, update_excludes, format_archive, check_extension_modules, Statistics, \
     is_cachedir, bigint_to_int, ChunkerParams, CompressionSpec
@@ -155,7 +155,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                     continue
             else:
                 restrict_dev = None
-            self._process(archive, cache, args.excludes, args.exclude_caches, skip_inodes, path, restrict_dev,
+            self._process(archive, cache, args.excludes, args.exclude_caches, args.exclude_if_present, skip_inodes, path, restrict_dev,
                           read_special=args.read_special, dry_run=dry_run)
         if not dry_run:
             archive.save(timestamp=args.timestamp)
@@ -175,7 +175,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
                 print('-' * 78)
         return self.exit_code
 
-    def _process(self, archive, cache, excludes, exclude_caches, skip_inodes, path, restrict_dev,
+    def _process(self, archive, cache, excludes, exclude_caches, exclude_if_present, skip_inodes, path, restrict_dev,
                  read_special=False, dry_run=False):
         if exclude_path(path, excludes):
             return
@@ -203,6 +203,10 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         elif stat.S_ISDIR(st.st_mode):
             if exclude_caches and is_cachedir(path):
                 return
+            if exclude_if_present:
+                for tag in exclude_if_present:
+                    if tag.match(path):
+                        return
             if not dry_run:
                 status = archive.process_dir(path, st)
             try:
@@ -212,7 +216,7 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
             else:
                 for filename in sorted(entries):
                     entry_path = os.path.normpath(os.path.join(path, filename))
-                    self._process(archive, cache, excludes, exclude_caches, skip_inodes,
+                    self._process(archive, cache, excludes, exclude_caches, exclude_if_present, skip_inodes,
                                   entry_path, restrict_dev, read_special=read_special,
                                   dry_run=dry_run)
         elif stat.S_ISLNK(st.st_mode):
@@ -707,6 +711,9 @@ Type "Yes I am sure" if you understand this and want to continue.\n""")
         subparser.add_argument('--exclude-caches', dest='exclude_caches',
                                action='store_true', default=False,
                                help='exclude directories that contain a CACHEDIR.TAG file (http://www.brynosaurus.com/cachedir/spec.html)')
+        subparser.add_argument('--exclude-if-present', dest='exclude_if_present',
+                               type=Tag, action='append',
+                               metavar="PATH", help='exclude paths containing PATH')
         subparser.add_argument('-c', '--checkpoint-interval', dest='checkpoint_interval',
                                type=int, default=300, metavar='SECONDS',
                                help='write checkpoint every SECONDS seconds (Default: 300)')

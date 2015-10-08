@@ -243,6 +243,34 @@ def normalized(func):
         return func
 
 
+class Tag:
+    def __init__(self, path):
+        self.path_orig = path
+
+        if sys.platform in ('darwin',):
+            path = unicodedata.normalize("NFD", path)
+
+        if os.path.isabs(path):
+            raise ValueError
+
+        self.path = path
+
+    @normalized
+    def match(self,path):
+        tag_path = os.path.join(path, self.path)
+        try:
+            if os.path.exists(tag_path):
+                return True
+        except OSError:
+            pass
+        return False
+
+    def __repr__(self):
+        return '%s(%s)' % (type(self), self.path)
+
+    def __str__(self):
+        return self.path_orig
+
 class IncludePattern:
     """Literal files or directories listed on the command line
     for some operations (e.g. extract, but not create).
@@ -385,7 +413,6 @@ def is_cachedir(path):
     except OSError:
         pass
     return False
-
 
 def format_time(t):
     """Format datetime suitable for fixed length list output
